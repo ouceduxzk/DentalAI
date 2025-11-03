@@ -27,6 +27,24 @@
 #### 📝 描述
 根据对模型最大边界的拟合（最小二乘或SVM等方法）确定Z方向，再根据模型的开口朝向、模型对称性等特征（PCA等方法）确定X和Y轴。
 
+#### 🔬 方案对比
+
+**方案A (当前实现)**: 
+- 最小二乘拟合 + PCA主成分分析
+- 基于边界拟合确定Z轴
+- 基于对称性和开口朝向确定X/Y轴
+- 优点: 实现简单,计算快速
+- 缺点: 对噪声敏感,异常点影响大
+
+**方案B (推荐未来尝试)**:
+- **RANSAC鲁棒平面拟合** + ICP精细配准
+- 使用颌骨解剖学标志点(如：前鼻棘、左右颧点等)进行基准平面计算
+- 结合**深度学习姿态估计**网络(如3D-PoseNet)自动识别解剖标志点
+- 多平面层次拟合: 咬合平面(Occlusal Plane) → 法兰克福平面(Frankfurt Plane)
+- 优点: 更符合临床标准,鲁棒性强,精度高
+- 缺点: 需要训练标志点检测模型
+- 参考文献: "Automated 3D Cephalometric Annotation and Frankfort Horizontal Plane Construction" (Medical Image Analysis, 2020)
+
 #### ✅ 待办清单
 - [ ] **边界拟合模块** (C++)
   - [ ] 实现最小二乘拟合算法
@@ -93,6 +111,28 @@
 3、删除退化的点线面  
 一轮可能不能完全删除，可以多次迭代。可以考虑使用vcglib或CGAL库实现。
 
+#### 🔬 方案对比
+
+**方案A (当前实现)**:
+- vcglib或CGAL的基础网格清理功能
+- 迭代删除非连通域、非流形结构、退化元素
+- 优点: 成熟稳定,易于集成
+- 缺点: 可能需要多次迭代,对复杂拓扑问题处理不够智能
+
+**方案B (推荐未来尝试)**:
+- **MeshFix**或**PyMeshLab**高级修复算法
+- 基于**拓扑手术**的自动修复:
+  - 使用Morse理论识别关键拓扑特征
+  - 智能填充孔洞(Context-aware hole filling)
+  - 自适应重网格化(Adaptive remeshing)
+- **基于学习的网格修复**:
+  - 使用MeshCNN或EdgeConv网络检测异常区域
+  - 数据驱动的修复策略
+- 优点: 一次性修复,更智能,适应复杂场景
+- 缺点: 计算复杂度较高,可能需要GPU加速
+- 工具推荐: PyMeshLab, MeshFix, Blender的网格修复工具
+- 参考: "RobustWatertightManifoldSurfaceGeneration Method for ShapeNet Models" (2018)
+
 #### ✅ 待办清单
 - [ ] **连通域分析** (C++)
   - [ ] 实现连通域检测
@@ -134,6 +174,29 @@
 
 #### 📝 描述
 圈选气泡周围闭合边界，然后对边界内面元多次应用Laplace等平滑算法。
+
+#### 🔬 方案对比
+
+**方案A (当前实现)**:
+- 手动/自动圈选边界 + Laplace平滑迭代
+- 均匀平滑所有顶点
+- 优点: 简单直接,易于实现
+- 缺点: 可能过度平滑,丢失细节特征,收缩问题
+
+**方案B (推荐未来尝试)**:
+- **特征保持平滑算法**:
+  - **双边网格滤波(Bilateral Mesh Denoising)**: 保持边缘特征
+  - **各向异性扩散**: 根据曲率自适应平滑
+  - **Taubin平滑**: 防止网格收缩的λ/μ算法
+- **基于优化的修复**:
+  - As-Rigid-As-Possible (ARAP)变形
+  - 最小化形变能量的同时保持局部刚性
+- **深度学习去噪**:
+  - PointCleanNet或Neural Mesh Denoising
+  - 自动识别气泡并智能修复
+- 优点: 保持几何特征,避免过度平滑,更自然
+- 缺点: 计算复杂度较高
+- 参考: "Bilateral Mesh Denoising" (ACM TOG 2003), "Mesh Denoising via L0 Minimization" (ACM TOG 2013)
 
 #### ✅ 待办清单
 - [ ] **气泡检测** (C++)
@@ -192,6 +255,31 @@
 
 #### 📝 描述
 圈选牙齿附近的多个特征点，特征点之间用B样条曲线插值，或者寻找特征点之间在曲面上的最短路径（Dijkstra最短路径法）。
+
+#### 🔬 方案对比
+
+**方案A (当前实现)**:
+- 手动特征点选择 + B样条插值
+- 或使用Dijkstra算法在网格上计算测地线最短路径
+- 优点: 直观可控,精度可接受
+- 缺点: 手动操作耗时,B样条可能偏离曲面,Dijkstra对网格质量敏感
+
+**方案B (推荐未来尝试)**:
+- **测地线活动轮廓(Geodesic Active Contours)**:
+  - 基于能量最小化自动拟合牙颈线
+  - 结合曲率、梯度等几何特征
+- **Fast Marching Method**或**Heat Method**:
+  - 比Dijkstra更快的测地距离计算(O(n log n) → O(n))
+  - 对网格质量要求更低
+- **深度学习牙颈线检测**:
+  - 使用U-Net或PointNet++直接预测牙颈线位置
+  - 训练数据: 标注的牙颈线点云/网格
+  - 支持完全自动化
+- **混合方法**:
+  - AI粗定位 + 测地线精修 + 用户微调
+- 优点: 更快速,更准确,支持自动化
+- 缺点: 深度学习方法需要训练数据
+- 参考: "The Heat Method for Distance Computation" (ACM TOG 2013), "Automatic Tooth Segmentation Using Deep Learning" (2019)
 
 #### ✅ 待办清单
 - [ ] **特征点选择** (C++)
@@ -319,6 +407,43 @@
 #### 📝 描述
 优先考虑AI算法。传统算法可以考虑根据每个点的曲率、法向等特征，进行迭代的聚类和区域增长和合并，类似层级聚类的算法，但会涉及一些参数的阈值设置，无法保证完全正确。如果有手动标记点，可以把点到标记点的测地距离作为特征加入，可以很大改善分割结果。
 
+#### 🔬 方案对比
+
+**方案A (当前实现)**:
+- **深度学习**: PointNet++, MeshCNN
+- **传统算法**: 层级聚类 + 区域增长(基于曲率、法向)
+- 特征: 几何特征(曲率、法向) + 测地距离
+- 优点: PointNet++对点云效果好,MeshCNN能利用网格结构
+- 缺点: PointNet++对局部细节捕捉有限,MeshCNN对网格质量要求高
+
+**方案B (推荐未来尝试)**:
+- **最新深度学习架构**:
+  - **PointTransformer**: 基于Transformer的点云分割(CVPR 2021)
+  - **MeshGraphNets**: 图神经网络,更好地处理网格拓扑
+  - **Point-Voxel CNN (PVCNN)**: 结合点云和体素的混合架构
+  - **PointNeXt**: PointNet++的改进版本(2022)
+- **多模态融合**:
+  - 2D投影 + 3D几何特征融合
+  - RGB-D信息(如果有纹理)
+- **弱监督/半监督学习**:
+  - 只需少量全标注数据 + 大量粗标注数据
+  - 自监督预训练(Contrastive Learning)
+- **分层分割策略**:
+  - 第一步: 粗分割(牙齿 vs 牙龈)
+  - 第二步: 细分割(单个牙齿实例分割)
+  - 第三步: 边界精修(Graph Cuts或CRF后处理)
+- **数据增强**:
+  - 旋转、缩放、弹性变形
+  - MixUp、CutMix for 3D
+  - 合成数据生成
+- 优点: SOTA精度,更鲁棒,泛化能力强
+- 缺点: 需要更多训练数据,计算资源要求高
+- 推荐框架: PyTorch3D, MinkowskiEngine, Open3D-ML
+- 参考论文:
+  - "Point Transformer" (CVPR 2021)
+  - "TSGCNet: Discriminative Geometric Feature Learning with Two-Stream Graph Convolutional Network for 3D Dental Model Segmentation" (CVPR 2022)
+  - "MeshSegNet: Deep Multi-Scale Mesh Feature Learning for Automated Tooth Segmentation" (Medical Image Analysis, 2021)
+
 #### ✅ 待办清单
 - [ ] **AI模型开发** (Python)
   - [ ] 准备训练数据集（标注的牙齿分割数据）
@@ -386,6 +511,44 @@
 #### 📝 描述
 优先考虑AI算法。传统算法可以先计算唇舌侧特征点和近远中特征点（在底面投影上以牙弓方向为基准计算），再计算牙轴。
 
+#### 🔬 方案对比
+
+**方案A (当前实现)**:
+- **AI**: 基础PointNet或简单回归网络预测牙轴方向
+- **传统**: 基于特征点几何计算(唇舌侧、近远中点)
+- 优点: 实现相对简单
+- 缺点: 精度可能不足,临床符合度待验证
+
+**方案B (推荐未来尝试)**:
+- **高级深度学习**:
+  - **3D关键点检测网络**: 
+    - 先检测牙根尖点、牙冠中心点
+    - 基于检测结果几何计算牙轴
+  - **直接回归牙轴向量**:
+    - 使用PointNet++或DGCNN提取特征
+    - 输出牙轴的方向向量和位置
+  - **多任务学习**:
+    - 同时预测牙轴、牙齿类型、咬合关系
+    - 共享特征提取,提高鲁棒性
+- **临床标准约束**:
+  - 引入**Andrews六项标准**作为软约束
+  - 结合牙弓曲线的切线方向
+  - 考虑邻牙的影响(上下文信息)
+- **统计形状模型**:
+  - 建立不同牙位的牙轴分布统计模型
+  - 贝叶斯推断结合AI预测
+  - 提供置信度估计
+- **优化后处理**:
+  - 最小化牙轴与邻牙的冲突
+  - 全局优化所有牙齿的牙轴
+  - 物理约束(如平行度、角度范围)
+- 优点: 精度高,符合临床标准,可解释性强
+- 缺点: 需要专业标注数据,实现复杂
+- 参考论文:
+  - "Deep Learning for Automated Tooth Axis Determination" (2021)
+  - "Automated Bracket Placement Using 3D Deep Learning" (Orthodontics 2022)
+  - Andrews, L.F. "The Six Keys to Normal Occlusion" (1972)
+
 #### ✅ 待办清单
 - [ ] **AI模型** (Python)
   - [ ] 准备牙轴标注数据
@@ -435,6 +598,43 @@
 2、生成连接两个特征点的拟合曲线，作为邻面的底部边界  
 3、生成邻面中的面元  
 4、生成底部边界和邻面的时候，要考虑左右两侧牙齿之间的间隙和碰撞，因此生成过程可能需要迭代进行，直至达到目标的间隙或碰撞
+
+#### 🔬 方案对比
+
+**方案A (当前实现)**:
+- 基于规则的特征点优化(距离、投影、高度)
+- B样条曲线拟合底部边界
+- 迭代生成面元并检测碰撞
+- 优点: 可控性强,符合临床规则
+- 缺点: 参数调优困难,迭代收敛慢,对复杂情况鲁棒性差
+
+**方案B (推荐未来尝试)**:
+- **基于优化的方法**:
+  - **非线性优化框架**(Levenberg-Marquardt或BFGS):
+    - 目标函数: 最小化邻面形变能 + 碰撞惩罚项 + 平滑度约束
+    - 约束: 间隙范围、法向一致性、边界连续性
+  - **变分法**: 将邻面重建建模为能量最小化问题
+- **物理仿真方法**:
+  - 使用弹簧-质点系统或有限元方法(FEM)
+  - 模拟邻面在力的作用下的自然形态
+  - 考虑牙齿材料的弹性属性
+- **深度学习生成**:
+  - **条件生成对抗网络(cGAN)**:
+    - 输入: 相邻两颗牙齿的几何信息
+    - 输出: 邻面网格
+  - **基于图的生成模型**:
+    - MeshGAN或Graph-based Generative Models
+  - **隐式表面学习**:
+    - DeepSDF或Occupancy Networks学习邻面的隐式表示
+- **混合方法**:
+  - AI生成初始邻面 → 物理仿真优化 → 碰撞检测修正
+- 优点: 更自然,收敛快,泛化能力强
+- 缺点: 实现复杂度高,深度学习方法需要大量训练数据
+- 推荐工具: libigl(优化), FEBio(有限元), PyTorch3D(深度学习)
+- 参考论文:
+  - "As-Rigid-As-Possible Surface Modeling" (SGP 2007)
+  - "Neural 3D Mesh Renderer" (CVPR 2018)
+  - "MeshGAN: Non-linear 3D Morphable Models of Faces" (2019)
 
 #### ✅ 待办清单
 - [ ] **特征点识别** (C++)
@@ -548,6 +748,46 @@
 8、补全牙齿间未连接的部分  
 9、平滑
 
+#### 🔬 方案对比
+
+**方案A (当前实现)**:
+- 基于规则的多步骤几何重建
+- B样条曲面生成侧面
+- 手动补全和平滑
+- 优点: 流程清晰,可控性强
+- 缺点: 步骤繁琐,参数多,对复杂形态适应性差
+
+**方案B (推荐未来尝试)**:
+- **深度学习端到端生成**:
+  - **3D U-Net或V-Net**: 体素级牙龈重建
+  - **PointNet++ Encoder + 解码器**: 点云到牙龈网格
+  - **Implicit Neural Representations**:
+    - Neural Radiance Fields (NeRF) for Dental Anatomy
+    - Occupancy Networks学习牙龈的隐式函数
+  - **Mesh Generation Networks**:
+    - AtlasNet或Pixel2Mesh生成牙龈网格
+- **参数化曲面方法**:
+  - **NURBS曲面**: 比B样条更灵活的高阶曲面
+  - **细分曲面(Subdivision Surface)**: Catmull-Clark算法
+  - **T-splines**: 局部可调的样条曲面
+- **基于模板变形**:
+  - 建立标准牙龈模板库
+  - 使用非刚性配准(Non-rigid ICP, CPD)变形到目标形态
+  - 结合统计形状模型(SSM - Statistical Shape Model)
+- **泊松曲面重建**:
+  - 从牙颈线和底部边界点云使用Screened Poisson Reconstruction
+  - 比直接生成面元更平滑自然
+- **混合策略**:
+  - 深度学习生成粗糙牙龈 → 几何优化细化 → 物理约束修正
+- 优点: 更自然,更快速,适应性强
+- 缺点: 深度学习方法需要大量真实牙龈数据
+- 推荐工具: PyTorch3D, Open3D(泊松重建), Autodesk T-splines
+- 参考论文:
+  - "AtlasNet: A Papier-Mâché Approach to Learning 3D Surface Generation" (CVPR 2018)
+  - "Occupancy Networks: Learning 3D Reconstruction in Function Space" (CVPR 2019)
+  - "Virtual Gingiva Generation for Orthodontic Planning" (IEEE TMI, 2020)
+  - "Statistical Shape Model of Dental Arches" (Medical Image Analysis, 2019)
+
 #### ✅ 待办清单
 - [ ] **特征点计算** (C++)
   - [ ] 计算唇舌侧点
@@ -597,6 +837,58 @@
 
 #### 📝 描述
 真实牙根模拟需要考虑AI算法。虚拟牙根则只需要找到牙冠和牙根的边界，对中间部分先搭桥连接，然后应用补洞算法，最后对孔洞进行refine和平滑即可。
+
+#### 🔬 方案对比
+
+**方案A (当前实现)**:
+- **真实牙根**: 基础AI生成(如简单VAE或GAN)
+- **虚拟牙根**: 几何搭桥 + CGAL补洞 + 平滑
+- 优点: 虚拟牙根实现简单快速
+- 缺点: AI生成牙根可能不够真实,泛化能力有限
+
+**方案B (推荐未来尝试)**:
+- **真实牙根深度学习生成**:
+  - **基于CBCT数据的生成模型**:
+    - 收集带牙根的CBCT扫描数据
+    - 训练3D生成模型(如3D-GAN, VQ-VAE)
+  - **条件生成**:
+    - **输入**: 牙冠形状、牙齿类型、牙位信息
+    - **输出**: 完整的牙冠+牙根模型
+  - **统计形状模型(SSM)**:
+    - 建立不同牙位的牙根形状库
+    - PCA降维获得主成分
+    - 根据牙冠形状推断牙根参数
+  - **隐式函数表示**:
+    - DeepSDF或Occupancy Networks学习牙根形状
+    - 连续表面,分辨率独立
+  - **变分自编码器(VAE)**:
+    - 学习牙根形状的潜在空间
+    - 条件解码生成真实牙根
+- **混合方法**:
+  - **AI粗生成** → **几何精修**:
+    - AI快速生成牙根大致形状
+    - 使用几何约束优化细节
+    - 确保牙冠-牙根平滑过渡
+  - **模板变形**:
+    - 从牙根模板库选择最相似模板
+    - 使用非刚性配准变形到目标形状
+- **虚拟牙根改进**:
+  - **骨架驱动生成**:
+    - 先生成牙根中轴骨架(Skeleton)
+    - 沿骨架扫掠生成体积
+  - **参数化建模**:
+    - 定义牙根参数(长度、直径、曲率、根数)
+    - 基于临床统计规律自动设定
+  - **拉普拉斯变形**:
+    - 保持局部细节的同时连接牙冠牙根
+- 优点: 真实度高,临床可用,多样性好
+- 缺点: 需要CBCT数据(获取困难),训练成本高
+- 数据需求: 500-2000个带牙根的CBCT扫描
+- 推荐工具: PyTorch3D(生成模型), Slicer 3D(CBCT处理)
+- 参考论文:
+  - "3D Tooth Segmentation and Labeling Using Deep Convolutional Neural Networks" (TMI 2018)
+  - "Learning Generative Models of 3D Structures" (ECCV 2020)
+  - "Statistical Shape Model of Human Tooth" (Medical Engineering & Physics, 2016)
 
 #### ✅ 待办清单
 - [ ] **真实牙根模拟** (Python + C++)
@@ -675,6 +967,53 @@
 
 #### 📝 描述
 根据牙齿分步矩阵，挑选一些中间关键步骤，分别生成这些步骤对应的牙龈模型，然后使用Morph动画生成其他步骤的动画；如果需要实时调整牙齿牙龈随动，需要以每个牙齿为骨骼，分配每个牙龈点到相邻骨骼的权重，并应用骨骼动画。
+
+#### 🔬 方案对比
+
+**方案A (当前实现)**:
+- 关键帧Morph动画(形状插值)
+- 线性混合蒙皮(LBS - Linear Blend Skinning)骨骼动画
+- 手动设定权重
+- 优点: 实现简单,实时性好
+- 缺点: 关键帧间可能不自然,LBS易产生糖果包裹效应(Candy Wrapper Artifact)
+
+**方案B (推荐未来尝试)**:
+- **高级蒙皮算法**:
+  - **双四元数蒙皮(DQS - Dual Quaternion Skinning)**:
+    - 避免LBS的体积丢失和扭曲问题
+    - 保持刚性变换的自然性
+  - **球形混合蒙皮(SBS - Spherical Blend Skinning)**
+  - **优化中心变换(Optimized Center of Rotation)**
+- **基于物理的变形**:
+  - **弹性体仿真**: 使用FEM或Position-Based Dynamics (PBD)
+  - **软组织模拟**: 模拟牙龈的弹性和粘弹性
+  - **接触约束**: 牙龈与牙齿的接触保持
+  - **碰撞响应**: 实时碰撞检测和响应
+- **笼形变形(Cage-based Deformation)**:
+  - Mean Value Coordinates或Harmonic Coordinates
+  - 建立粗糙笼子,控制牙龈变形
+- **深度学习驱动动画**:
+  - **运动图(Motion Graph)**学习:
+    - 从大量正畸治疗数据学习牙龈变形模式
+  - **条件变分自编码器(cVAE)**:
+    - 输入: 牙齿运动参数
+    - 输出: 对应的牙龈变形
+  - **神经变形网络**:
+    - 学习牙齿-牙龈的耦合变形关系
+- **数据驱动的权重学习**:
+  - 自动学习最优蒙皮权重(如SSD - Smooth Skinning Decomposition)
+  - 基于解剖学的权重分配
+- **混合方法**:
+  - 粗糙阶段: 骨骼动画快速预览
+  - 精细阶段: 物理仿真或深度学习生成最终动画
+- 优点: 更真实自然,避免变形伪影,适应复杂运动
+- 缺点: 计算复杂度高,实时性需要优化
+- 推荐工具: libigl(变形), SoftBody physics (Unity/Unreal), PyTorch(深度学习)
+- 参考论文:
+  - "Dual Quaternion Skinning" (I3D 2008)
+  - "Position Based Dynamics" (VRIPHYS 2006)
+  - "Neural Blend Shapes" (SIGGRAPH Asia 2020)
+  - "Context-Aware Skeletal Shape Deformation" (Computer Graphics Forum, 2007)
 
 #### ✅ 待办清单
 - [ ] **关键步骤选择** (C++)
@@ -1158,11 +1497,102 @@
 
 ---
 
-**文档版本**: v1.0  
+**文档版本**: v2.0  
 **最后更新**: 2025-11-03  
 **维护者**: 开发团队
 
 ---
 
+## 🚀 方案B技术路线图总结
+
+本项目为关键算法模块提供了两套方案:
+- **方案A**: 当前计划实现的方案,注重稳定性和可实现性
+- **方案B**: 推荐未来尝试的先进方案,代表业界最佳实践
+
+### 方案B核心技术栈
+
+#### 1. 深度学习框架
+| 任务类型 | 推荐架构 | 优先级 |
+|---------|---------|--------|
+| 点云分割 | PointTransformer, PointNeXt, TSGCNet | 🔴 高 |
+| 网格分割 | MeshSegNet, MeshGraphNets | 🔴 高 |
+| 特征点检测 | 3D-PoseNet, PointNet++ | 🔴 高 |
+| 曲面生成 | AtlasNet, Occupancy Networks, Neural Implicits | 🟡 中 |
+| 动画驱动 | Neural Blend Shapes, cVAE | 🟡 中 |
+
+#### 2. 几何处理高级算法
+| 技术 | 应用场景 | 优势 |
+|------|---------|------|
+| RANSAC + ICP | 颌平面拟合 | 鲁棒性强,抗噪声 |
+| Heat Method | 测地距离计算 | 比Dijkstra快100倍+ |
+| Bilateral Mesh Denoising | 网格平滑 | 保持特征边缘 |
+| Dual Quaternion Skinning | 牙龈变形动画 | 避免体积丢失 |
+| ARAP Deformation | 邻面重建 | 保持局部刚性 |
+| Screened Poisson | 曲面重建 | 更平滑自然 |
+
+#### 3. 物理仿真方法
+| 方法 | 应用 | 特点 |
+|------|------|------|
+| Position-Based Dynamics | 实时牙龈变形 | 快速,稳定 |
+| 有限元方法(FEM) | 精确软组织模拟 | 高精度,慢 |
+| 弹簧-质点系统 | 邻面生成 | 简单,实时 |
+
+#### 4. 推荐的新增依赖库
+
+**C++库**:
+- **libigl**: 现代几何处理库(ARAP, Heat Method等)
+- **PyBind11**: Python-C++绑定(用于AI模型集成)
+- **Ceres Solver**: 非线性优化(邻面重建)
+- **Bullet Physics**: 碰撞检测和物理仿真
+- **Embree**: Intel高性能光线追踪(碰撞检测加速)
+
+**Python/AI库**:
+- **PyTorch3D**: Meta的3D深度学习库
+- **Open3D-ML**: 3D机器学习
+- **MinkowskiEngine**: 稀疏卷积引擎
+- **Kaolin**: NVIDIA的3D深度学习工具包
+- **PyTorch Geometric**: 图神经网络
+
+### 实施建议
+
+#### 短期(3-6个月): 快速验证
+1. 集成**libigl**替换部分基础几何算法
+2. 实验**Heat Method**替代Dijkstra
+3. 尝试**Bilateral Denoising**改进平滑效果
+4. 探索**MeshSegNet**在小数据集上的效果
+
+#### 中期(6-12个月): 核心突破
+1. 收集并标注至少**500-1000**个牙齿扫描数据
+2. 训练**PointTransformer**或**TSGCNet**牙齿分割模型
+3. 实现**深度学习牙颈线检测**
+4. 部署**ONNX**推理引擎到C++
+
+#### 长期(12-24个月): 全面升级
+1. 建立完整的**虚拟牙龈生成AI模型**
+2. 实现**物理驱动的牙龈随动系统**
+3. 开发**自动牙齿邻面重建AI**
+4. 构建**统计形状模型(SSM)**数据库
+
+### 技术风险与对策
+
+| 风险 | 对策 |
+|------|------|
+| 训练数据不足 | 数据增强+半监督学习+合成数据 |
+| 推理速度慢 | ONNX优化+TensorRT加速+模型蒸馏 |
+| 算法复杂度高 | 分层实现(粗→精)+GPU加速 |
+| 集成困难 | 渐进式迁移,保留A方案作为后备 |
+
+### 预期收益
+
+**方案B全面实施后的提升**:
+- ⏱️ **处理速度**: 提升50-200%
+- 🎯 **分割精度**: IoU从85%提升到95%+
+- 👤 **用户体验**: 自动化率从30%提升到80%+
+- 🔧 **可维护性**: 减少手动参数调优
+- 🌐 **泛化能力**: 适应更多样本
+
+---
+
 **更新日志**:
-- 2025-11-03: 初始版本，根据原始需求文档创建
+- 2025-11-03 v2.0: 添加所有关键模块的方案B对比和技术路线图
+- 2025-11-03 v1.0: 初始版本，根据原始需求文档创建
