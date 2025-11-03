@@ -1,0 +1,49 @@
+# Deep Learning Frameworks
+torch>=2.0.0
+torchvision>=0.15.0
+tensorflow>=2.12.0
+onnx>=1.14.0
+onnxruntime>=1.15.0
+
+# Scientific Computing
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0
+
+# Data Processing
+pandas>=2.0.0
+pillow>=10.0.0
+opencv-python>=4.8.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+tensorboard>=2.12.0
+
+# 3D Processing (for dental models)
+trimesh>=3.23.0
+open3d>=0.17.0
+vtk>=9.2.0
+
+# Point Cloud Processing
+pytorch3d>=0.7.4
+plyfile>=0.9
+
+# Training Utilities
+tqdm>=4.65.0
+pyyaml>=6.0
+tensorboardX>=2.6
+
+# Model Deployment
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Code Quality
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.4.0
