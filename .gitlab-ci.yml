@@ -1,0 +1,203 @@
+# GitLab CI/CD 配置文件 - 牙齿分割与重建系统
+# 用于自动构建、测试和验证
+
+# 定义构建阶段
+stages:
+  - build
+  - test
+  - deploy
+
+# 定义变量
+variables:
+  BUILD_DIR: "build"
+  CMAKE_BUILD_TYPE: "Release"
+  GIT_SUBMODULE_STRATEGY: recursive
+
+# 使用包含所需依赖的 Docker 镜像
+# 注意：需要创建包含 Eigen3, PCL, CGAL 等依赖的镜像
+default:
+  image: ubuntu:22.04
+  before_script:
+    - echo "开始安装依赖..."
+    - apt-get update -qq
+    - DEBIAN_FRONTEND=noninteractive apt-get install -y -qq
+        build-essential
+        cmake
+        git
+        libeigen3-dev
+        libpcl-dev
+        libcgal-dev
+        libomp-dev
+        qtbase5-dev
+        qttools5-dev
+        libqt5opengl5-dev
+        libgtest-dev
+        libgmock-dev
+    - echo "构建并安装 Google Test..."
+    - cd /usr/src/gtest && cmake . && make && cp lib/*.a /usr/lib/ 2>/dev/null || cp *.a /usr/lib/
+    - cd /usr/src/gmock && cmake . && make && cp lib/*.a /usr/lib/ 2>/dev/null || cp *.a /usr/lib/
+    - cd $CI_PROJECT_DIR
+    - echo "依赖安装完成"
+
+# 构建阶段 - Release 版本
+build:release:
+  stage: build
+  script:
+    - echo "开始构建 Release 版本..."
+    - mkdir -p ${BUILD_DIR}
+    - cd ${BUILD_DIR}
+    - cmake .. 
+        -DCMAKE_BUILD_TYPE=Release
+        -DBUILD_TESTING=ON
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    - make -j$(nproc)
+    - echo "构建完成！"
+  artifacts:
+    paths:
+      - ${BUILD_DIR}/
+    expire_in: 1 hour
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-release
+    paths:
+      - ${BUILD_DIR}/*.o
+      - ${BUILD_DIR}/**/*.o
+
+# 构建阶段 - Debug 版本
+build:debug:
+  stage: build
+  script:
+    - echo "开始构建 Debug 版本..."
+    - mkdir -p build_debug
+    - cd build_debug
+    - cmake ..
+        -DCMAKE_BUILD_TYPE=Debug
+        -DBUILD_TESTING=ON
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    - make -j$(nproc)
+    - echo "Debug 构建完成！"
+  artifacts:
+    paths:
+      - build_debug/
+    expire_in: 1 hour
+  only:
+    - merge_requests
+    - develop
+    - main
+
+# 测试阶段 - 运行所有测试
+test:unit:
+  stage: test
+  dependencies:
+    - build:release
+  script:
+    - echo "开始运行单元测试..."
+    - cd ${BUILD_DIR}
+    - ctest --output-on-failure --verbose
+    - echo "测试完成！"
+  artifacts:
+    when: always
+    reports:
+      junit: ${BUILD_DIR}/test_results.xml
+    paths:
+      - ${BUILD_DIR}/Testing/
+    expire_in: 1 week
+  coverage: '/lines: \d+\.\d+%/'
+
+# 测试阶段 - Debug 模式测试
+test:debug:
+  stage: test
+  dependencies:
+    - build:debug
+  script:
+    - echo "开始运行 Debug 模式测试..."
+    - cd build_debug
+    - ctest --output-on-failure --verbose
+    - echo "Debug 测试完成！"
+  artifacts:
+    when: always
+    paths:
+      - build_debug/Testing/
+    expire_in: 1 week
+  only:
+    - merge_requests
+    - develop
+    - main
+
+# 代码质量检查（可选）
+code:quality:
+  stage: test
+  script:
+    - echo "运行代码质量检查..."
+    - apt-get install -y -qq cppcheck
+    - cppcheck --enable=all --inconclusive --xml --xml-version=2 src/ 2> cppcheck-report.xml || true
+    - echo "代码质量检查完成"
+  artifacts:
+    when: always
+    paths:
+      - cppcheck-report.xml
+    expire_in: 1 week
+  allow_failure: true
+  only:
+    - merge_requests
+    - develop
+    - main
+
+# 内存检查（使用 valgrind，可选）
+test:memory:
+  stage: test
+  dependencies:
+    - build:debug
+  script:
+    - echo "安装 valgrind..."
+    - apt-get install -y -qq valgrind
+    - echo "运行内存检查..."
+    - cd build_debug
+    - for test_exe in bin/*test*; do
+        if [ -x "$test_exe" ]; then
+          echo "检查 $test_exe";
+          valgrind --leak-check=full --error-exitcode=1 "$test_exe" || true;
+        fi
+      done
+    - echo "内存检查完成"
+  allow_failure: true
+  only:
+    - merge_requests
+    - main
+
+# 部署阶段 - 生成文档（可选）
+pages:
+  stage: deploy
+  dependencies:
+    - build:release
+  script:
+    - echo "生成项目文档..."
+    - apt-get install -y -qq doxygen graphviz
+    - doxygen Doxyfile || echo "Doxyfile 不存在，跳过文档生成"
+    - mkdir -p public
+    - if [ -d "docs/html" ]; then cp -r docs/html/* public/; fi
+    - if [ -d "build/docs/html" ]; then cp -r build/docs/html/* public/; fi
+    - echo "文档生成完成"
+  artifacts:
+    paths:
+      - public
+    expire_in: 30 days
+  only:
+    - main
+  allow_failure: true
+
+# 快速检查 - 仅编译，用于快速反馈
+quick:check:
+  stage: build
+  script:
+    - echo "快速编译检查..."
+    - mkdir -p build_quick
+    - cd build_quick
+    - cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+    - make -j$(nproc)
+    - echo "快速检查完成！"
+  only:
+    - branches
+  except:
+    - main
+    - develop
+  when: manual
