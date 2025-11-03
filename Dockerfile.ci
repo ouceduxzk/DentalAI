@@ -1,0 +1,61 @@
+# Dockerfile for GitLab CI/CD
+# 包含所有构建和测试所需的依赖
+
+FROM ubuntu:22.04
+
+LABEL maintainer="Dental Segmentation Team"
+LABEL description="CI/CD environment for Dental Segmentation Project"
+
+# 设置非交互模式
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai
+
+# 更新包列表并安装基础工具
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # 基础构建工具
+    build-essential \
+    cmake \
+    git \
+    wget \
+    ca-certificates \
+    pkg-config \
+    # 编译器和工具
+    gcc \
+    g++ \
+    make \
+    ninja-build \
+    # C++ 依赖库
+    libeigen3-dev \
+    libpcl-dev \
+    libcgal-dev \
+    libomp-dev \
+    # Qt5 (GUI，可选)
+    qtbase5-dev \
+    qttools5-dev \
+    libqt5opengl5-dev \
+    # Google Test
+    libgtest-dev \
+    # 测试和代码质量工具
+    cppcheck \
+    valgrind \
+    clang-format \
+    # 文档生成
+    doxygen \
+    graphviz \
+    && rm -rf /var/lib/apt/lists/*
+
+# 构建并安装 Google Test（Ubuntu 包只提供源码）
+RUN cd /usr/src/gtest && \
+    cmake . && \
+    make && \
+    cp lib/*.a /usr/lib/ || cp *.a /usr/lib/ && \
+    cd /usr/src/gmock && \
+    cmake . && \
+    make && \
+    cp lib/*.a /usr/lib/ || cp *.a /usr/lib/
+
+# 设置工作目录
+WORKDIR /workspace
+
+# 设置默认命令
+CMD ["/bin/bash"]
