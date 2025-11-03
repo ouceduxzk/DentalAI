@@ -1,0 +1,47 @@
+# 牙齿分割训练配置
+
+# 数据配置
+data:
+  train_path: "data/segmentation/train"
+  val_path: "data/segmentation/val"
+  test_path: "data/segmentation/test"
+  num_points: 10000  # 采样点数
+  num_classes: 33    # 32个牙齿 + 背景
+
+# 模型配置
+model:
+  name: "pointnet++"  # pointnet++, meshsegnet
+  backbone: "pointnet2_ssg"
+  feature_dim: 256
+
+# 训练配置
+training:
+  batch_size: 16
+  epochs: 200
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  optimizer: "adam"
+  scheduler: "cosine"
+  
+  # 检查点
+  checkpoint_dir: "checkpoints/segmentation"
+  save_frequency: 10  # 每N个epoch保存一次
+  
+  # 日志
+  log_dir: "logs/segmentation"
+  log_frequency: 10  # 每N个batch打印一次
+  
+  # 早停
+  early_stopping_patience: 20
+
+# 损失函数配置
+loss:
+  type: "cross_entropy"  # cross_entropy, focal_loss
+  class_weights: null  # 可选：类别权重
+  ignore_index: -1
+
+# 评估配置
+evaluation:
+  metrics: ["iou", "dice", "accuracy"]
+  save_predictions: true
+  visualize: true

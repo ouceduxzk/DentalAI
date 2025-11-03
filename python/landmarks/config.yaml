@@ -1,0 +1,27 @@
+# 地标点检测配置
+
+data:
+  train_path: "data/landmarks/train"
+  val_path: "data/landmarks/val"
+  num_landmarks: 10  # 每个牙齿的关键点数量
+  num_points: 2048
+
+model:
+  name: "landmark_net"
+  backbone: "pointnet"
+  feature_dim: 512
+
+training:
+  batch_size: 32
+  epochs: 150
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  checkpoint_dir: "checkpoints/landmarks"
+  log_dir: "logs/landmarks"
+  save_frequency: 10
+
+loss:
+  type: "mse"  # Mean Squared Error for coordinate regression
+
+evaluation:
+  metrics: ["mre", "pck"]  # Mean Radial Error, Percentage of Correct Keypoints
