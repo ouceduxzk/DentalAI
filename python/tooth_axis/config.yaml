@@ -1,0 +1,22 @@
+# 牙轴检测配置
+
+data:
+  train_path: "data/tooth_axis/train"
+  val_path: "data/tooth_axis/val"
+  num_points: 2048
+
+model:
+  name: "tooth_axis_net"
+  backbone: "pointnet"
+
+training:
+  batch_size: 32
+  epochs: 150
+  learning_rate: 0.001
+  checkpoint_dir: "checkpoints/tooth_axis"
+  log_dir: "logs/tooth_axis"
+
+loss:
+  type: "combined"  # MSE for origin + Angular loss for direction
+  origin_weight: 1.0
+  direction_weight: 2.0
